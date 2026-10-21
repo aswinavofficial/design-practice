@@ -84,6 +84,25 @@
   .pager { display: flex; justify-content: space-between; gap: 12px; margin-top: 18px; font-size: 14px; }
   .pager a { color: var(--accent); text-decoration: none; font-weight: 600; max-width: 48%; }
   .pager .ph { max-width: 48%; }
+  .reveal-box {
+    margin-top: 32px; padding: 22px 24px; text-align: center;
+    border: 1px dashed var(--accent); border-radius: 12px; background: var(--accent-soft);
+  }
+  .reveal-box .rb-title { font-weight: 700; font-size: 16px; }
+  .reveal-box .rb-sub { color: var(--muted); font-size: 14px; margin: 6px auto 14px; max-width: 560px; }
+  .reveal-box button {
+    background: var(--accent); color: #fff; border: none; border-radius: 8px;
+    padding: 9px 18px; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  .reveal-box button.ghost { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+  .reveal-box .count { font-weight: 800; }
+  #solution-section { margin-top: 36px; }
+  .solution-heading { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .solution-heading h2 { margin: 0; font-size: 18px; }
+  .badge {
+    background: var(--accent); color: #fff; font-size: 11px; font-weight: 800;
+    letter-spacing: .08em; padding: 3px 9px; border-radius: 999px; text-transform: uppercase;
+  }
   footer { border-top: 1px solid var(--border); color: var(--muted); font-size: 13px; padding: 18px 20px 44px; text-align: center; }
   footer a { color: var(--muted); }
 </style>
@@ -170,8 +189,31 @@
   }
 
   let fetchSeq = 0;
-  async function showDoc(id) {
+  let revealTimer = null;
+  let currentProject = null;
+
+  function clearReveal() {
+    if (revealTimer) { clearInterval(revealTimer); revealTimer = null; }
+  }
+
+  async function enhanceMarkdown(root) {
+    root.querySelectorAll("pre > code.language-mermaid").forEach((codeEl) => {
+      const div = document.createElement("div");
+      div.className = "mermaid";
+      div.textContent = codeEl.textContent; // textContent is already entity-decoded
+      codeEl.parentElement.replaceWith(div);
+    });
+    root.querySelectorAll("pre code").forEach((el) => hljs.highlightElement(el));
+    const diagrams = root.querySelectorAll(".mermaid");
+    if (diagrams.length) {
+      try { await mermaid.run({ nodes: diagrams }); }
+      catch (e) { console.error("mermaid render failed:", e); }
+    }
+  }
+
+  async function showDoc(id, { autoReveal = false } = {}) {
     const mySeq = ++fetchSeq;
+    clearReveal();
     const proj = PROJECTS.find((p) => p.id === id);
     const file = id === "readme" ? "README.md" : `${id}.md`;
 
@@ -183,6 +225,10 @@
     body.innerHTML = `<p class="loading">Loading ${file}…</p>`;
     $("#src-link").href = `${REPO}/blob/main/${file}`;
 
+    currentProject = proj || null;
+    const existingSolution = document.getElementById("solution-section");
+    if (existingSolution) existingSolution.remove();
+
     const idx = PROJECTS.indexOf(proj);
     setPager("#prev-link", "#prev-ph", idx > 0 ? PROJECTS[idx - 1] : null, "← ");
     setPager("#next-link", "#next-ph", idx >= 0 && idx < PROJECTS.length - 1 ? PROJECTS[idx + 1] : null, "", " →");
@@ -193,20 +239,7 @@
       const md = await res.text();
       if (mySeq !== fetchSeq) return; // a newer navigation superseded this one
       body.innerHTML = marked.parse(md);
-
-      body.querySelectorAll("pre > code.language-mermaid").forEach((codeEl) => {
-        const div = document.createElement("div");
-        div.className = "mermaid";
-        div.textContent = codeEl.textContent; // textContent is already entity-decoded
-        codeEl.parentElement.replaceWith(div);
-      });
-      body.querySelectorAll("pre code").forEach((el) => hljs.highlightElement(el));
-
-      const diagrams = body.querySelectorAll(".mermaid");
-      if (diagrams.length) {
-        try { await mermaid.run({ nodes: diagrams }); }
-        catch (e) { console.error("mermaid render failed:", e); }
-      }
+      await enhanceMarkdown(body);
     } catch (err) {
       if (mySeq !== fetchSeq) return;
       body.innerHTML = `<p class="error">Couldn't load ${file} (${err.message}).
@@ -215,6 +248,82 @@
         can't read <code>file://</code> URLs.</p>`;
     }
     window.scrollTo({ top: 0 });
+
+    if (proj && mySeq === fetchSeq) {
+      const sec = document.createElement("section");
+      sec.id = "solution-section";
+      document.querySelector("#view-doc .pager").before(sec);
+      if (autoReveal) {
+        await loadSolution(proj, sec, mySeq);
+      } else {
+        renderRevealBox(sec, proj);
+      }
+    }
+  }
+
+  function renderRevealBox(sec, proj) {
+    sec.innerHTML = `
+      <div class="reveal-box">
+        <div class="rb-title">Done designing?</div>
+        <div class="rb-sub">Commit to your own ERD and contract first — that struggle is the exercise.
+          When you're ready, the full solution (assumptions, DDL, API contract, back-of-the-envelope)
+          is one click away.</div>
+        <button id="reveal-btn" type="button">Show me the solution</button>
+      </div>`;
+    sec.querySelector("#reveal-btn").addEventListener("click", () => startCountdown(sec, proj));
+  }
+
+  function startCountdown(sec, proj) {
+    let n = 5;
+    const paint = () => {
+      sec.innerHTML = `
+        <div class="reveal-box">
+          <div class="rb-title">Revealing the solution in <span class="count">${n}</span> second${n === 1 ? "" : "s"}…</div>
+          <div class="rb-sub">Last chance to close your notes and commit to a design.</div>
+          <button id="cancel-btn" type="button" class="ghost">Cancel</button>
+        </div>`;
+      sec.querySelector("#cancel-btn").addEventListener("click", cancelCountdown);
+    };
+    paint();
+    revealTimer = setInterval(() => {
+      n -= 1;
+      if (n <= 0) {
+        clearReveal();
+        loadSolution(proj, sec, fetchSeq);
+      } else {
+        paint();
+      }
+    }, 1000);
+  }
+
+  function cancelCountdown() {
+    clearReveal();
+    const sec = document.getElementById("solution-section");
+    if (sec && currentProject) renderRevealBox(sec, currentProject);
+  }
+
+  async function loadSolution(proj, sec, mySeq) {
+    clearReveal();
+    sec.innerHTML = `
+      <div class="solution-heading">
+        <span class="badge">Solution</span>
+        <h2>${proj.id.slice(0, 2)} · ${proj.title}</h2>
+      </div>
+      <article id="solution-body" class="markdown-body"><p class="loading">Loading ${proj.id}-solution.md…</p></article>`;
+    const bodyEl = sec.querySelector("#solution-body");
+    try {
+      const res = await fetch(`${proj.id}-solution.md`);
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const md = await res.text();
+      if (mySeq !== undefined && mySeq !== fetchSeq) return;
+      bodyEl.innerHTML = marked.parse(md);
+      await enhanceMarkdown(bodyEl);
+      document.title = "Solution · " + proj.title + " — API Design Practice";
+      sec.scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (err) {
+      if (mySeq !== undefined && mySeq !== fetchSeq) return;
+      bodyEl.innerHTML = `<p class="error">Couldn't load ${proj.id}-solution.md (${err.message}).</p>`;
+    }
   }
 
   function setPager(linkSel, phSel, target, prefix, suffix = "") {
@@ -231,10 +340,14 @@
   function route() {
     const id = decodeURIComponent(location.hash.replace(/^#/, ""));
     if (!id || id === "home") {
+      clearReveal();
       $("#view-doc").hidden = true;
       $("#view-home").hidden = false;
       document.title = "API Design Practice — from requirements to schema & contract";
       window.scrollTo({ top: 0 });
+    } else if (id.endsWith("-solution") && PROJECTS.some((p) => p.id + "-solution" === id)) {
+      // deep link straight to a revealed solution
+      showDoc(id.replace(/-solution$/, ""), { autoReveal: true });
     } else {
       showDoc(id);
     }
