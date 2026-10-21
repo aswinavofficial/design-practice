@@ -127,6 +127,35 @@
   #studio-editor-pane .CodeMirror { height: 100%; font-size: 13px; line-height: 1.5; }
   #studio-render-pane { flex: 1; overflow-y: auto; background: #fff; min-width: 0; }
   #studio-render-pane .swagger-ui { padding: 12px 20px 40px; }
+  #studio-section { margin-top: 36px; }
+  .studio-inline-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  .studio-status { font-size: 13px; color: var(--muted); }
+  .studio-status.ok { color: #16a34a; }
+  .studio-status.err { color: #dc2626; }
+  .studio-chips { display: flex; gap: 6px; }
+  .studio-chip {
+    background: transparent; border: 1px solid var(--border); color: var(--muted);
+    border-radius: 999px; padding: 4px 12px; font-size: 12px; font-weight: 600; cursor: pointer;
+    font-family: inherit;
+  }
+  .studio-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .studio-split { display: flex; min-height: 0; }
+  .studio-editor-pane {
+    width: 44%; min-width: 300px; border: 1px solid var(--border); border-radius: 12px;
+    overflow: hidden; display: flex; background: var(--panel);
+  }
+  .studio-editor-pane .CodeMirror { flex: 1; }
+  .studio-render-pane {
+    flex: 1; border: 1px solid var(--border); border-radius: 12px; overflow-y: auto;
+    background: #fff; min-width: 0; max-height: 560px;
+  }
+  .studio-render-pane .swagger-ui { padding: 12px 20px 40px; }
+  .studio-inline .CodeMirror { height: 540px; font-size: 12.5px; line-height: 1.5; }
+  @media (max-width: 860px) {
+    .studio-split { flex-direction: column; }
+    .studio-editor-pane { width: 100%; min-width: 0; }
+    .studio-inline .CodeMirror { height: 320px; }
+  }
   @media (max-width: 860px) {
     #studio-split { flex-direction: column; }
     #studio-editor-pane { width: 100%; min-width: 0; height: 45%; border-right: none; border-bottom: 1px solid var(--border); }
@@ -174,6 +203,21 @@
       </span>
     </nav>
     <article id="doc-body" class="markdown-body"></article>
+    <div id="doc-extras">
+      <section id="studio-section" hidden>
+        <div class="studio-inline-head">
+          <span class="badge">API Studio</span>
+          <span id="studio-inline-status" class="studio-status"></span>
+          <span id="studio-chips" class="studio-chips"></span>
+          <button class="studio-btn" id="studio-inline-copy" type="button">Copy YAML</button>
+          <a class="studio-btn" id="studio-inline-external" href="#" target="_blank" rel="noopener" hidden>editor-next ↗</a>
+        </div>
+        <div class="studio-split studio-inline">
+          <div class="studio-editor-pane"><textarea id="studio-inline-editor"></textarea></div>
+          <div class="studio-render-pane" id="studio-inline-render"></div>
+        </div>
+      </section>
+    </div>
     <nav class="pager">
       <a id="prev-link" hidden></a>
       <span class="ph" id="prev-ph" hidden></span>
@@ -267,6 +311,7 @@
   async function showDoc(id, { autoReveal = false } = {}) {
     const mySeq = ++fetchSeq;
     clearReveal();
+    resetInlineStudio();
     const proj = PROJECTS.find((p) => p.id === id);
     const file = id === "readme" ? "README.md" : `${id}.md`;
 
@@ -302,24 +347,42 @@
     }
     window.scrollTo({ top: 0 });
 
-    const specYaml = findSpecYaml(body);
-    const studioBtn = $("#studio-btn");
-    if (specYaml) {
-      studioBtn.hidden = false;
-      studioBtn.onclick = () => openStudio(specYaml, proj ? proj.id : null);
-    } else {
-      studioBtn.hidden = true;
-    }
-
     if (proj && mySeq === fetchSeq) {
       const sec = document.createElement("section");
       sec.id = "solution-section";
-      document.querySelector("#view-doc .pager").before(sec);
+      document.getElementById("doc-extras").prepend(sec);
       if (autoReveal) {
         await loadSolution(proj, sec, mySeq);
       } else {
         renderRevealBox(sec, proj);
       }
+    }
+
+    // Inline API Studio: embedded on every project/solution page, pre-filled
+    // with the page's contract. loadSolution may already have loaded the
+    // solution spec (autoReveal) — then just add the question spec as a chip.
+    if (proj && mySeq === fetchSeq) {
+      const specYaml = findSpecYaml(body);
+      if (specYaml) {
+        $("#studio-section").hidden = false;
+        ensureInlineStudio();
+        if (inlineStudio.current === null) {
+          setInlineSpecs(proj.id, { question: specYaml }, "question");
+        } else {
+          inlineStudio.specs.question = specYaml;
+          syncInlineStudio();
+        }
+        const studioBtn = $("#studio-btn");
+        studioBtn.hidden = false;
+        studioBtn.onclick = () =>
+          $("#studio-section").scrollIntoView({ behavior: "smooth", block: "start" });
+      } else {
+        $("#studio-section").hidden = true;
+        $("#studio-btn").hidden = true;
+      }
+    } else if (mySeq === fetchSeq) {
+      $("#studio-section").hidden = true;
+      $("#studio-btn").hidden = true;
     }
   }
 
@@ -382,9 +445,9 @@
       await enhanceMarkdown(bodyEl);
       const solSpec = findSpecYaml(bodyEl);
       if (solSpec) {
-        const studioBtn = $("#studio-btn");
-        studioBtn.hidden = false;
-        studioBtn.onclick = () => openStudio(solSpec, proj.id + "-solution");
+        $("#studio-section").hidden = false; // unhide BEFORE creating CodeMirror (needs layout)
+        ensureInlineStudio();
+        setInlineSpecs(proj.id, { solution: solSpec }, "solution");
       }
       document.title = "Solution · " + proj.title + " — API Design Practice";
       sec.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -486,13 +549,13 @@ paths:
     studio.timer = setTimeout(renderStudioSpec, 500);
   }
 
-  function mountSwagger(obj) {
+  function mountSwagger(obj, holderId) {
     // Fresh mount per render: updateJsonSpec races Swagger UI's async init,
     // but a spec passed at construction always renders.
-    const holder = document.getElementById("swagger-ui");
+    const holder = document.getElementById(holderId);
     holder.innerHTML = "";
     SwaggerUIBundle({
-      dom_id: "#swagger-ui",
+      dom_id: "#" + holderId,
       spec: obj,
       presets: [SwaggerUIBundle.presets.apis],
       docExpansion: "list",
@@ -500,19 +563,24 @@ paths:
     });
   }
 
-  function renderStudioSpec() {
-    const text = studio.cm.getValue();
+  function renderSpecText(text, holderId, statusEl) {
     try {
       const obj = jsyaml.load(text);
       if (typeof obj !== "object" || obj === null) throw new Error("document is empty");
       const paths = obj.paths ? Object.keys(obj.paths).length : 0;
-      mountSwagger(obj);
+      mountSwagger(obj, holderId);
       const version = obj.openapi ? "OpenAPI " + obj.openapi : obj.swagger ? "Swagger " + obj.swagger : "spec";
-      studioStatus(`✓ ${version} · ${paths} path${paths === 1 ? "" : "s"}`, "ok");
+      statusEl.textContent = `✓ ${version} · ${paths} path${paths === 1 ? "" : "s"}`;
+      statusEl.className = "studio-status ok";
     } catch (e) {
       const at = e.mark ? `line ${e.mark.line + 1}: ` : "";
-      studioStatus(`✗ YAML error — ${at}${e.message}`, "err");
+      statusEl.textContent = `✗ YAML error — ${at}${e.message}`;
+      statusEl.className = "studio-status err";
     }
+  }
+
+  function renderStudioSpec() {
+    renderSpecText(studio.cm.getValue(), "swagger-ui", $("#studio-status"));
   }
 
   function openStudio(yamlText, sourceName) {
@@ -539,6 +607,100 @@ paths:
     $("#studio-overlay").hidden = true;
     document.body.style.overflow = "";
   }
+
+  // ---------- Inline studio: embedded on every project/solution page ----------
+
+  const inlineStudio = {
+    cm: null, ready: false, suppress: false, timer: null,
+    specs: {}, current: null, projectId: null,
+  };
+
+  function resetInlineStudio() {
+    inlineStudio.specs = {};
+    inlineStudio.current = null;
+    inlineStudio.projectId = null;
+    const sec = document.getElementById("studio-section");
+    if (sec) sec.hidden = true;
+  }
+
+  function ensureInlineStudio() {
+    if (inlineStudio.ready) return;
+    inlineStudio.ready = true;
+    const darkMode = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    inlineStudio.cm = CodeMirror.fromTextArea(document.getElementById("studio-inline-editor"), {
+      mode: "yaml",
+      lineNumbers: true,
+      lineWrapping: true,
+      theme: darkMode ? "material-darker" : "default",
+    });
+    inlineStudio.cm.on("change", () => {
+      if (!inlineStudio.suppress) {
+        clearTimeout(inlineStudio.timer);
+        inlineStudio.timer = setTimeout(renderInlineSpec, 500);
+      }
+    });
+    $("#studio-inline-copy").addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(inlineStudio.cm.getValue());
+        const b = $("#studio-inline-copy");
+        b.textContent = "Copied!";
+        setTimeout(() => (b.textContent = "Copy YAML"), 1200);
+      } catch { /* clipboard blocked — user can select the text manually */ }
+    });
+  }
+
+  function setInlineSpecs(projectId, specs, active) {
+    inlineStudio.projectId = projectId;
+    inlineStudio.specs = { ...inlineStudio.specs, ...specs };
+    inlineStudio.current = active;
+    syncInlineStudio();
+  }
+
+  function setInlineSpec(name) {
+    inlineStudio.current = name;
+    syncInlineStudio();
+  }
+
+  function syncInlineStudio() {
+    const spec = inlineStudio.specs[inlineStudio.current] || "";
+    inlineStudio.suppress = true;
+    inlineStudio.cm.setValue(spec);
+    inlineStudio.suppress = false;
+    renderInlineSpec();
+    renderChips();
+    const ext = $("#studio-inline-external");
+    if (inlineStudio.projectId) {
+      const suffix = inlineStudio.current === "solution" ? "-solution" : "";
+      const base = location.pathname.replace(/\/[^/]*$/, "/");
+      ext.href = "https://editor-next.swagger.io/?url=" +
+        encodeURIComponent(location.origin + base + "openapi/" + inlineStudio.projectId + suffix + ".yaml");
+      ext.hidden = false;
+    } else {
+      ext.hidden = true;
+    }
+  }
+
+  function renderChips() {
+    const chips = $("#studio-chips");
+    chips.innerHTML = "";
+    for (const key of ["question", "solution"]) {
+      if (!inlineStudio.specs[key]) continue;
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "studio-chip" + (inlineStudio.current === key ? " active" : "");
+      b.textContent = key === "question" ? "Question spec" : "Solution spec";
+      b.addEventListener("click", () => setInlineSpec(key));
+      chips.appendChild(b);
+    }
+  }
+
+  function renderInlineSpec() {
+    renderSpecText(inlineStudio.cm.getValue(), "studio-inline-render", $("#studio-inline-status"));
+  }
+
+  window.addEventListener("resize", () => {
+    if (inlineStudio.ready) inlineStudio.cm.refresh();
+  });
 
   $("#open-studio").addEventListener("click", (e) => {
     e.preventDefault();

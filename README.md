@@ -92,6 +92,15 @@ api-design-practice/
 - **Contract testing**: Schemathesis
 - **Databases**: SQLite for projects 01–05; Postgres from 06 on (you'll want partial indexes, CHECK constraints, and real transactions)
 
+## API Studio
+
+Every project and solution page ends with an embedded **API Studio**: a YAML editor
+(CodeMirror) beside live Swagger UI rendering of whatever you type. Question pages
+load the OpenAPI skeleton; solution pages load the full contract, with a chip
+switcher between the two. The same blocks are extracted to `openapi/<slug>.yaml` at
+deploy time (`scripts/extract_openapi.py`) — that's what the studio's
+"editor-next ↗" link imports into the hosted Swagger Editor.
+
 ## Pacing
 
 Do **01–03 fully** — they build the reflexes. Skim 04–05 (ERD + decisions only) if time is short. Then pick **two** of 06–10 and go deep. Every project assumes the conventions of the ones before it.
