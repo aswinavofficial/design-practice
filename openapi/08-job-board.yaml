@@ -9,8 +9,8 @@ paths:
       # TODO: ?stage=&limit=&cursor= — 404 if job is another company's (byte-identical
       #       to unknown job) — write that requirement into the description
       responses: {}
-  /jobs/{jobId}/applications:   # POST on the same path — candidate applies
     post:
+      # candidate applies — same path, different role & operation
       # TODO: 201 | 409 already_applied | 422 job_not_published | 422 job_closed
       #       — note: draft job for an outsider is 404, NOT 422. why? (document it)
       responses: {}
