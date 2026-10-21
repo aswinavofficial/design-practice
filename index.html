@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>API Design Practice — from requirements to schema & contract</title>
+<meta name="description" content="10 graded practice projects for turning software requirements into database schemas and API contracts.">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --text: #1c2130; --muted: #5b6472;
+    --accent: #4f46e5; --accent-soft: #eef0ff; --border: #e3e6ec;
+    --code-bg: #0d1117; --pre-text: #e6edf3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e1014; --panel: #161a22; --text: #e7eaf0; --muted: #98a1b0;
+      --accent: #8b93f8; --accent-soft: #20253f; --border: #262c38;
+      --code-bg: #0d1117; --pre-text: #e6edf3;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text); line-height: 1.65;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 0 20px; }
+  .site-header { border-bottom: 1px solid var(--border); background: var(--panel); position: sticky; top: 0; z-index: 5; }
+  .header-inner { display: flex; align-items: baseline; gap: 14px; padding: 14px 20px; }
+  .brand { font-weight: 700; font-size: 18px; color: var(--text); text-decoration: none; }
+  .tagline { color: var(--muted); font-size: 13px; }
+  .gh-link { margin-left: auto; color: var(--accent); text-decoration: none; font-size: 14px; font-weight: 600; white-space: nowrap; }
+  main { padding: 28px 0 56px; }
+  .intro { font-size: 16px; color: var(--muted); max-width: 740px; }
+  h2.section { margin: 34px 0 4px; font-size: 20px; }
+  .start-card {
+    display: block; padding: 18px 20px; margin: 18px 0 6px;
+    background: var(--accent-soft); border: 1px solid var(--border); border-radius: 12px;
+    text-decoration: none; color: var(--text);
+  }
+  .start-card:hover { border-color: var(--accent); }
+  .start-card .st { font-weight: 700; color: var(--accent); }
+  .start-card .sd { color: var(--muted); font-size: 14px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(255px, 1fr)); gap: 14px; margin-top: 16px; }
+  .card {
+    display: flex; flex-direction: column; gap: 6px; padding: 16px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    text-decoration: none; color: var(--text); transition: border-color .15s, transform .15s;
+  }
+  .card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .card .num { font-size: 12px; font-weight: 700; color: var(--accent); letter-spacing: .06em; }
+  .card-title { font-weight: 650; line-height: 1.35; }
+  .stars { color: var(--accent); font-size: 13px; letter-spacing: 2px; }
+  .focus { color: var(--muted); font-size: 13px; line-height: 1.5; }
+  .doc-nav { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 16px; font-size: 14px; }
+  .doc-nav a { color: var(--accent); text-decoration: none; font-weight: 600; }
+  .markdown-body { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 30px 36px; overflow-wrap: break-word; }
+  .markdown-body h1 { font-size: 27px; line-height: 1.3; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+  .markdown-body h2 { font-size: 20px; border-bottom: 1px solid var(--border); padding-bottom: 6px; margin-top: 34px; }
+  .markdown-body h3 { font-size: 16.5px; margin-top: 26px; }
+  .markdown-body code {
+    background: var(--accent-soft); padding: 2px 5px; border-radius: 5px; font-size: .88em;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  .markdown-body pre { background: var(--code-bg); color: var(--pre-text); padding: 16px 18px; border-radius: 10px; overflow-x: auto; line-height: 1.55; }
+  .markdown-body pre code { background: none; padding: 0; color: inherit; font-size: 12.5px; }
+  .markdown-body table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 13.5px; display: block; overflow-x: auto; }
+  .markdown-body th, .markdown-body td { border: 1px solid var(--border); padding: 7px 12px; text-align: left; vertical-align: top; }
+  .markdown-body th { background: var(--accent-soft); }
+  .markdown-body blockquote {
+    margin: 14px 0; padding: 10px 18px; border-left: 4px solid var(--accent);
+    background: var(--accent-soft); border-radius: 0 8px 8px 0;
+  }
+  .markdown-body blockquote p { margin: 6px 0; }
+  .markdown-body hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
+  .markdown-body a { color: var(--accent); }
+  .markdown-body ul, .markdown-body ol { padding-left: 26px; }
+  .markdown-body li { margin: 4px 0; }
+  .markdown-body input[type="checkbox"] { margin-right: 6px; }
+  .mermaid { margin: 18px 0; overflow-x: auto; text-align: center; }
+  .loading { color: var(--muted); }
+  .error { color: var(--muted); }
+  .pager { display: flex; justify-content: space-between; gap: 12px; margin-top: 18px; font-size: 14px; }
+  .pager a { color: var(--accent); text-decoration: none; font-weight: 600; max-width: 48%; }
+  .pager .ph { max-width: 48%; }
+  footer { border-top: 1px solid var(--border); color: var(--muted); font-size: 13px; padding: 18px 20px 44px; text-align: center; }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="brand" href="#home">API Design Practice</a>
+    <span class="tagline">requirements → schema → contract</span>
+    <a class="gh-link" href="https://github.com/aswinavofficial/design-practice" target="_blank" rel="noopener">GitHub ↗</a>
+  </div>
+</header>
+
+<main class="wrap">
+  <section id="view-home">
+    <p class="intro">
+      Ten graded projects for practicing the translation from vague human requirements
+      into two precise artifacts: a database schema and an API contract. Click a card to
+      open the full brief — requirements, design decisions to resolve, a starter ERD,
+      and an OpenAPI skeleton to finish.
+    </p>
+    <a class="start-card" href="#readme">
+      <span class="st">Start here → workflow &amp; conventions</span><br>
+      <span class="sd">How each project works, the rules of the game, and the house conventions (IDs, money, errors, pagination) reused across all ten.</span>
+    </a>
+    <h2 class="section">The ladder — easiest first</h2>
+    <div class="cards" id="cards"></div>
+  </section>
+
+  <section id="view-doc" hidden>
+    <nav class="doc-nav">
+      <a href="#home">← Overview</a>
+      <a id="src-link" href="#" target="_blank" rel="noopener">View source on GitHub ↗</a>
+    </nav>
+    <article id="doc-body" class="markdown-body"></article>
+    <nav class="pager">
+      <a id="prev-link" hidden></a>
+      <span class="ph" id="prev-ph" hidden></span>
+      <span class="ph" id="next-ph" hidden></span>
+      <a id="next-link" hidden></a>
+    </nav>
+  </section>
+</main>
+
+<footer>
+  Rendered in your browser with marked, highlight.js and mermaid ·
+  <a href="https://github.com/aswinavofficial/design-practice" target="_blank" rel="noopener">site source</a>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.2.0/dist/mermaid.min.js"></script>
+<script>
+  const REPO = "https://github.com/aswinavofficial/design-practice";
+  const PROJECTS = [
+    { id: "01-notes-app",           title: "Notes App",                        stars: 1, focus: "Entities → tables, join tables, first OpenAPI, error envelope" },
+    { id: "02-url-shortener",       title: "URL Shortener with Click Stats",   stars: 1, focus: "Uniqueness, generated keys, redirect semantics, store-vs-compute" },
+    { id: "03-todo-projects",       title: "Todo Manager with Projects & Users", stars: 2, focus: "Auth, ownership, filtering/sorting/pagination, PATCH semantics" },
+    { id: "04-expense-splitter",    title: "Expense Splitter",                 stars: 3, focus: "Derived data, money integrity, split invariants, settlements" },
+    { id: "05-library-rental",      title: "Library / Rental System",          stars: 3, focus: "State machines, title-vs-instance modeling, row-level concurrency" },
+    { id: "06-event-ticketing",     title: "Event Ticketing",                  stars: 4, focus: "Holds & expiry, idempotency keys, oversell prevention" },
+    { id: "07-ecommerce-orders",    title: "E-commerce Catalog & Orders",      stars: 4, focus: "Price snapshots, catalog filter contract, checkout transactions" },
+    { id: "08-job-board",           title: "Job Board with Roles",             stars: 4, focus: "RBAC-shaped API, 404 vs 403, append-only audit events" },
+    { id: "09-multi-tenant-tracker", title: "Multi-tenant Project Tracker",    stars: 5, focus: "Tenancy strategy, versioning, cursor pagination, rate limits, webhooks" },
+    { id: "10-ledger-api",          title: "Double-entry Ledger API",          stars: 5, focus: "Immutability, double-entry invariants, keyset pagination, reconciliation" },
+  ];
+
+  marked.use({ gfm: true, breaks: false });
+  const darkMode = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  mermaid.initialize({ startOnLoad: false, theme: darkMode ? "dark" : "neutral", securityLevel: "strict" });
+
+  const $ = (sel) => document.querySelector(sel);
+  const stars = (n) => "★".repeat(n) + "☆".repeat(5 - n);
+
+  function buildCards() {
+    $("#cards").innerHTML = PROJECTS.map((p) => `
+      <a class="card" href="#${p.id}">
+        <span class="num">${p.id.slice(0, 2)}</span>
+        <span class="card-title">${p.title}</span>
+        <span class="stars" title="difficulty ${p.stars}/5">${stars(p.stars)}</span>
+        <span class="focus">${p.focus}</span>
+      </a>`).join("");
+  }
+
+  let fetchSeq = 0;
+  async function showDoc(id) {
+    const mySeq = ++fetchSeq;
+    const proj = PROJECTS.find((p) => p.id === id);
+    const file = id === "readme" ? "README.md" : `${id}.md`;
+
+    $("#view-home").hidden = true;
+    $("#view-doc").hidden = false;
+    document.title = (proj ? proj.title + " — " : "") + "API Design Practice";
+
+    const body = $("#doc-body");
+    body.innerHTML = `<p class="loading">Loading ${file}…</p>`;
+    $("#src-link").href = `${REPO}/blob/main/${file}`;
+
+    const idx = PROJECTS.indexOf(proj);
+    setPager("#prev-link", "#prev-ph", idx > 0 ? PROJECTS[idx - 1] : null, "← ");
+    setPager("#next-link", "#next-ph", idx >= 0 && idx < PROJECTS.length - 1 ? PROJECTS[idx + 1] : null, "", " →");
+
+    try {
+      const res = await fetch(file);
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const md = await res.text();
+      if (mySeq !== fetchSeq) return; // a newer navigation superseded this one
+      body.innerHTML = marked.parse(md);
+
+      body.querySelectorAll("pre > code.language-mermaid").forEach((codeEl) => {
+        const div = document.createElement("div");
+        div.className = "mermaid";
+        div.textContent = codeEl.textContent; // textContent is already entity-decoded
+        codeEl.parentElement.replaceWith(div);
+      });
+      body.querySelectorAll("pre code").forEach((el) => hljs.highlightElement(el));
+
+      const diagrams = body.querySelectorAll(".mermaid");
+      if (diagrams.length) {
+        try { await mermaid.run({ nodes: diagrams }); }
+        catch (e) { console.error("mermaid render failed:", e); }
+      }
+    } catch (err) {
+      if (mySeq !== fetchSeq) return;
+      body.innerHTML = `<p class="error">Couldn't load ${file} (${err.message}).
+        If you opened this page from disk, serve the folder over HTTP instead —
+        e.g. <code>python3 -m http.server</code> — because <code>fetch()</code>
+        can't read <code>file://</code> URLs.</p>`;
+    }
+    window.scrollTo({ top: 0 });
+  }
+
+  function setPager(linkSel, phSel, target, prefix, suffix = "") {
+    const link = $(linkSel), ph = $(phSel);
+    if (target) {
+      link.hidden = false; ph.hidden = true;
+      link.href = "#" + target.id;
+      link.textContent = prefix + target.id.slice(0, 2) + " · " + target.title + suffix;
+    } else {
+      link.hidden = true; ph.hidden = false;
+    }
+  }
+
+  function route() {
+    const id = decodeURIComponent(location.hash.replace(/^#/, ""));
+    if (!id || id === "home") {
+      $("#view-doc").hidden = true;
+      $("#view-home").hidden = false;
+      document.title = "API Design Practice — from requirements to schema & contract";
+      window.scrollTo({ top: 0 });
+    } else {
+      showDoc(id);
+    }
+  }
+
+  buildCards();
+  window.addEventListener("hashchange", route);
+  route();
+</script>
+</body>
+</html>
