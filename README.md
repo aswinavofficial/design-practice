@@ -94,12 +94,14 @@ api-design-practice/
 
 ## API Studio
 
-Every project and solution page ends with an embedded **API Studio**: a YAML editor
-(CodeMirror) beside live Swagger UI rendering of whatever you type. Question pages
-load the OpenAPI skeleton; solution pages load the full contract, with a chip
-switcher between the two. The same blocks are extracted to `openapi/<slug>.yaml` at
-deploy time (`scripts/extract_openapi.py`) — that's what the studio's
-"editor-next ↗" link imports into the hosted Swagger Editor.
+Wherever a brief or solution contains an OpenAPI contract — the "OpenAPI skeleton"
+section in questions, "OpenAPI (the load-bearing parts)" in solutions — the site
+renders it as an embedded **API Studio**: a YAML editor (CodeMirror) beside live
+Swagger UI, right at that spot in the page. Edit the contract and the docs update;
+Copy YAML and an "editor-next ↗" import link are on each widget's header. The same
+blocks are extracted to `openapi/<slug>.yaml` at deploy time
+(`scripts/extract_openapi.py`), which is what the import link opens in the hosted
+Swagger Editor. The home page also offers a blank-template studio.
 
 ## Pacing
 

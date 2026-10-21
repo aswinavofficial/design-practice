@@ -127,18 +127,11 @@
   #studio-editor-pane .CodeMirror { height: 100%; font-size: 13px; line-height: 1.5; }
   #studio-render-pane { flex: 1; overflow-y: auto; background: #fff; min-width: 0; }
   #studio-render-pane .swagger-ui { padding: 12px 20px 40px; }
-  #studio-section { margin-top: 36px; }
-  .studio-inline-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  .yaml-studio { margin: 22px 0; }
+  .yaml-studio-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
   .studio-status { font-size: 13px; color: var(--muted); }
   .studio-status.ok { color: #16a34a; }
   .studio-status.err { color: #dc2626; }
-  .studio-chips { display: flex; gap: 6px; }
-  .studio-chip {
-    background: transparent; border: 1px solid var(--border); color: var(--muted);
-    border-radius: 999px; padding: 4px 12px; font-size: 12px; font-weight: 600; cursor: pointer;
-    font-family: inherit;
-  }
-  .studio-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
   .studio-split { display: flex; min-height: 0; }
   .studio-editor-pane {
     width: 44%; min-width: 300px; border: 1px solid var(--border); border-radius: 12px;
@@ -147,14 +140,14 @@
   .studio-editor-pane .CodeMirror { flex: 1; }
   .studio-render-pane {
     flex: 1; border: 1px solid var(--border); border-radius: 12px; overflow-y: auto;
-    background: #fff; min-width: 0; max-height: 560px;
+    background: #fff; min-width: 0; max-height: 480px;
   }
   .studio-render-pane .swagger-ui { padding: 12px 20px 40px; }
-  .studio-inline .CodeMirror { height: 540px; font-size: 12.5px; line-height: 1.5; }
+  .studio-embed .CodeMirror { height: 480px; font-size: 12.5px; line-height: 1.5; }
   @media (max-width: 860px) {
     .studio-split { flex-direction: column; }
     .studio-editor-pane { width: 100%; min-width: 0; }
-    .studio-inline .CodeMirror { height: 320px; }
+    .studio-embed .CodeMirror { height: 300px; }
   }
   @media (max-width: 860px) {
     #studio-split { flex-direction: column; }
@@ -188,7 +181,7 @@
     </a>
     <a class="start-card" href="#" id="open-studio">
       <span class="st">API Studio → edit &amp; render OpenAPI contracts</span><br>
-      <span class="sd">A built-in YAML editor with live Swagger UI rendering. Opens pre-filled from any project page via its “API Studio” button, or start from a blank template here.</span>
+      <span class="sd">A built-in YAML editor with live Swagger UI rendering — embedded right under each project's OpenAPI section. Or start editing from a blank template here.</span>
     </a>
     <h2 class="section">The ladder — easiest first</h2>
     <div class="cards" id="cards"></div>
@@ -198,26 +191,11 @@
     <nav class="doc-nav">
       <a href="#home">← Overview</a>
       <span class="doc-nav-right">
-        <button id="studio-btn" class="studio-btn" type="button" hidden>API Studio</button>
         <a id="src-link" href="#" target="_blank" rel="noopener">View source on GitHub ↗</a>
       </span>
     </nav>
     <article id="doc-body" class="markdown-body"></article>
-    <div id="doc-extras">
-      <section id="studio-section" hidden>
-        <div class="studio-inline-head">
-          <span class="badge">API Studio</span>
-          <span id="studio-inline-status" class="studio-status"></span>
-          <span id="studio-chips" class="studio-chips"></span>
-          <button class="studio-btn" id="studio-inline-copy" type="button">Copy YAML</button>
-          <a class="studio-btn" id="studio-inline-external" href="#" target="_blank" rel="noopener" hidden>editor-next ↗</a>
-        </div>
-        <div class="studio-split studio-inline">
-          <div class="studio-editor-pane"><textarea id="studio-inline-editor"></textarea></div>
-          <div class="studio-render-pane" id="studio-inline-render"></div>
-        </div>
-      </section>
-    </div>
+    <div id="doc-extras"></div>
     <nav class="pager">
       <a id="prev-link" hidden></a>
       <span class="ph" id="prev-ph" hidden></span>
@@ -293,12 +271,18 @@
     if (revealTimer) { clearInterval(revealTimer); revealTimer = null; }
   }
 
-  async function enhanceMarkdown(root) {
+  async function enhanceMarkdown(root, specName = null) {
     root.querySelectorAll("pre > code.language-mermaid").forEach((codeEl) => {
       const div = document.createElement("div");
       div.className = "mermaid";
       div.textContent = codeEl.textContent; // textContent is already entity-decoded
       codeEl.parentElement.replaceWith(div);
+    });
+    root.querySelectorAll("pre > code.language-yaml").forEach((codeEl) => {
+      const text = codeEl.textContent;
+      if (text.includes("openapi:")) {
+        embedStudioInPlace(codeEl.parentElement, text, specName);
+      }
     });
     root.querySelectorAll("pre code").forEach((el) => hljs.highlightElement(el));
     const diagrams = root.querySelectorAll(".mermaid");
@@ -311,7 +295,6 @@
   async function showDoc(id, { autoReveal = false } = {}) {
     const mySeq = ++fetchSeq;
     clearReveal();
-    resetInlineStudio();
     const proj = PROJECTS.find((p) => p.id === id);
     const file = id === "readme" ? "README.md" : `${id}.md`;
 
@@ -337,7 +320,7 @@
       const md = await res.text();
       if (mySeq !== fetchSeq) return; // a newer navigation superseded this one
       body.innerHTML = marked.parse(md);
-      await enhanceMarkdown(body);
+      await enhanceMarkdown(body, proj ? proj.id : null);
     } catch (err) {
       if (mySeq !== fetchSeq) return;
       body.innerHTML = `<p class="error">Couldn't load ${file} (${err.message}).
@@ -356,33 +339,6 @@
       } else {
         renderRevealBox(sec, proj);
       }
-    }
-
-    // Inline API Studio: embedded on every project/solution page, pre-filled
-    // with the page's contract. loadSolution may already have loaded the
-    // solution spec (autoReveal) — then just add the question spec as a chip.
-    if (proj && mySeq === fetchSeq) {
-      const specYaml = findSpecYaml(body);
-      if (specYaml) {
-        $("#studio-section").hidden = false;
-        ensureInlineStudio();
-        if (inlineStudio.current === null) {
-          setInlineSpecs(proj.id, { question: specYaml }, "question");
-        } else {
-          inlineStudio.specs.question = specYaml;
-          syncInlineStudio();
-        }
-        const studioBtn = $("#studio-btn");
-        studioBtn.hidden = false;
-        studioBtn.onclick = () =>
-          $("#studio-section").scrollIntoView({ behavior: "smooth", block: "start" });
-      } else {
-        $("#studio-section").hidden = true;
-        $("#studio-btn").hidden = true;
-      }
-    } else if (mySeq === fetchSeq) {
-      $("#studio-section").hidden = true;
-      $("#studio-btn").hidden = true;
     }
   }
 
@@ -442,13 +398,7 @@
       const md = await res.text();
       if (mySeq !== undefined && mySeq !== fetchSeq) return;
       bodyEl.innerHTML = marked.parse(md);
-      await enhanceMarkdown(bodyEl);
-      const solSpec = findSpecYaml(bodyEl);
-      if (solSpec) {
-        $("#studio-section").hidden = false; // unhide BEFORE creating CodeMirror (needs layout)
-        ensureInlineStudio();
-        setInlineSpecs(proj.id, { solution: solSpec }, "solution");
-      }
+      await enhanceMarkdown(bodyEl, proj.id + "-solution");
       document.title = "Solution · " + proj.title + " — API Design Practice";
       sec.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (err) {
@@ -507,12 +457,6 @@ paths:
 `;
 
   const studio = { cm: null, ui: null, ready: false, suppress: false, timer: null };
-
-  function findSpecYaml(root) {
-    const el = [...root.querySelectorAll("pre code.language-yaml")]
-      .find((el) => el.textContent.includes("openapi:"));
-    return el ? el.textContent : null;
-  }
 
   function studioStatus(msg, cls) {
     const el = $("#studio-status");
@@ -608,99 +552,63 @@ paths:
     document.body.style.overflow = "";
   }
 
-  // ---------- Inline studio: embedded on every project/solution page ----------
+  // ---------- Embedded studios: each OpenAPI block in the markdown becomes
+  // an in-place editor + live Swagger UI render ----------
 
-  const inlineStudio = {
-    cm: null, ready: false, suppress: false, timer: null,
-    specs: {}, current: null, projectId: null,
-  };
+  let studioWidgetSeq = 0;
 
-  function resetInlineStudio() {
-    inlineStudio.specs = {};
-    inlineStudio.current = null;
-    inlineStudio.projectId = null;
-    const sec = document.getElementById("studio-section");
-    if (sec) sec.hidden = true;
-  }
-
-  function ensureInlineStudio() {
-    if (inlineStudio.ready) return;
-    inlineStudio.ready = true;
+  function embedStudioInPlace(preEl, yamlText, specName) {
+    const n = ++studioWidgetSeq;
+    const renderId = `studio-w-${n}-render`;
+    const wrap = document.createElement("div");
+    wrap.className = "yaml-studio";
+    wrap.innerHTML = `
+      <div class="yaml-studio-head">
+        <span class="badge">API Studio</span>
+        <span class="studio-status"></span>
+        <button type="button" class="studio-btn w-copy">Copy YAML</button>
+        <a class="studio-btn w-ext" target="_blank" rel="noopener" hidden>editor-next ↗</a>
+      </div>
+      <div class="studio-split studio-embed">
+        <div class="studio-editor-pane"><textarea id="studio-w-${n}-editor"></textarea></div>
+        <div class="studio-render-pane" id="${renderId}"></div>
+      </div>`;
+    preEl.replaceWith(wrap); // insert first — CodeMirror needs layout to size itself
+    const statusEl = wrap.querySelector(".studio-status");
     const darkMode = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    inlineStudio.cm = CodeMirror.fromTextArea(document.getElementById("studio-inline-editor"), {
+    const cm = CodeMirror.fromTextArea(wrap.querySelector("textarea"), {
       mode: "yaml",
       lineNumbers: true,
       lineWrapping: true,
       theme: darkMode ? "material-darker" : "default",
     });
-    inlineStudio.cm.on("change", () => {
-      if (!inlineStudio.suppress) {
-        clearTimeout(inlineStudio.timer);
-        inlineStudio.timer = setTimeout(renderInlineSpec, 500);
-      }
+    let suppress = false;
+    let timer = null;
+    cm.on("change", () => {
+      if (suppress) return;
+      clearTimeout(timer);
+      timer = setTimeout(() => renderSpecText(cm.getValue(), renderId, statusEl), 500);
     });
-    $("#studio-inline-copy").addEventListener("click", async () => {
+    wrap.querySelector(".w-copy").addEventListener("click", async () => {
       try {
-        await navigator.clipboard.writeText(inlineStudio.cm.getValue());
-        const b = $("#studio-inline-copy");
+        await navigator.clipboard.writeText(cm.getValue());
+        const b = wrap.querySelector(".w-copy");
         b.textContent = "Copied!";
         setTimeout(() => (b.textContent = "Copy YAML"), 1200);
-      } catch { /* clipboard blocked — user can select the text manually */ }
+      } catch { /* clipboard blocked — the text remains selectable */ }
     });
-  }
-
-  function setInlineSpecs(projectId, specs, active) {
-    inlineStudio.projectId = projectId;
-    inlineStudio.specs = { ...inlineStudio.specs, ...specs };
-    inlineStudio.current = active;
-    syncInlineStudio();
-  }
-
-  function setInlineSpec(name) {
-    inlineStudio.current = name;
-    syncInlineStudio();
-  }
-
-  function syncInlineStudio() {
-    const spec = inlineStudio.specs[inlineStudio.current] || "";
-    inlineStudio.suppress = true;
-    inlineStudio.cm.setValue(spec);
-    inlineStudio.suppress = false;
-    renderInlineSpec();
-    renderChips();
-    const ext = $("#studio-inline-external");
-    if (inlineStudio.projectId) {
-      const suffix = inlineStudio.current === "solution" ? "-solution" : "";
+    if (specName) {
       const base = location.pathname.replace(/\/[^/]*$/, "/");
+      const ext = wrap.querySelector(".w-ext");
       ext.href = "https://editor-next.swagger.io/?url=" +
-        encodeURIComponent(location.origin + base + "openapi/" + inlineStudio.projectId + suffix + ".yaml");
+        encodeURIComponent(location.origin + base + "openapi/" + specName + ".yaml");
       ext.hidden = false;
-    } else {
-      ext.hidden = true;
     }
+    suppress = true;
+    cm.setValue(yamlText);
+    suppress = false;
+    renderSpecText(yamlText, renderId, statusEl);
   }
-
-  function renderChips() {
-    const chips = $("#studio-chips");
-    chips.innerHTML = "";
-    for (const key of ["question", "solution"]) {
-      if (!inlineStudio.specs[key]) continue;
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = "studio-chip" + (inlineStudio.current === key ? " active" : "");
-      b.textContent = key === "question" ? "Question spec" : "Solution spec";
-      b.addEventListener("click", () => setInlineSpec(key));
-      chips.appendChild(b);
-    }
-  }
-
-  function renderInlineSpec() {
-    renderSpecText(inlineStudio.cm.getValue(), "studio-inline-render", $("#studio-inline-status"));
-  }
-
-  window.addEventListener("resize", () => {
-    if (inlineStudio.ready) inlineStudio.cm.refresh();
-  });
 
   $("#open-studio").addEventListener("click", (e) => {
     e.preventDefault();
