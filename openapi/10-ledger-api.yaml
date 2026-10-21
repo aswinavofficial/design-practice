@@ -1,0 +1,38 @@
+openapi: 3.1.0
+info:
+  title: Ledger API
+  version: 1.0.0
+  description: |
+    All writes are idempotent (Idempotency-Key required).
+    History is immutable: no endpoint updates or deletes anything;
+    corrections are reversal entries. Balances are derived from postings.
+paths:
+  /transfers:
+    post:
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, format: uuid }
+      # TODO: 201 {entry_id, postings} | 200 replayed
+      #       | 422 insufficient_funds | 409 account_closed | 422 currency_mismatch
+      #       | 422 idempotency_conflict (same key, different body)
+      responses: {}
+  /entries/{entryId}/reversal:
+    post:
+      # TODO: 201 mirrored entry with reversal_of set | 409 already_reversed
+      #       — full or partial? your decision, in the description
+      responses: {}
+  /accounts/{accountId}/statement:
+    get:
+      # TODO: cursor = opaque encoding of (seq) — never offset; response {data, next_cursor}
+      #       document: entries appear in seq order; the seq is immutable
+      responses: {}
+  /accounts/{accountId}/reconcile:
+    post:
+      # TODO: {matches: bool, stored_balance_cents, computed_balance_cents}
+      #       — what does a mismatch MEAN if your invariants hold? (say it out loud)
+      responses: {}
+components:
+  schemas:
+    Error: {}   # TODO: house envelope; the error code enum is the contract's vocabulary

@@ -1,0 +1,31 @@
+openapi: 3.1.0
+info:
+  title: Shortener API
+  version: 0.1.0
+paths:
+  /links:
+    post:
+      summary: Create a short link
+      # TODO: body {url, alias?, expires_on?}
+      # TODO: 201 | 409 alias_taken | 422 invalid_url | 422 reserved_alias
+      responses: {}
+    get:
+      summary: List links
+      # TODO: pagination; include click_count?
+      responses: {}
+  /links/{code}/stats:
+    get:
+      summary: Click stats for a link
+      # TODO: response shape {total_clicks, last_click_at?, daily: [...]}
+      # TODO: 404 unknown code
+      responses: {}
+  /r/{code}:
+    get:
+      summary: Redirect to target
+      # TODO: 302 with Location header (no body) — model the header
+      # TODO: 404 unknown | 410 expired | 404 or 410 deactivated — decide
+      responses: {}
+components:
+  schemas:
+    Error:
+      $ref: "#/components/schemas/Error"   # TODO: reuse the envelope from project 01

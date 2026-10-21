@@ -1,0 +1,76 @@
+openapi: 3.1.0
+info:
+  title: Ledger API
+  version: 1.0.0
+  description: |
+    History is immutable: no endpoint updates or deletes anything; corrections are
+    reversal entries. Balances are cached for speed; postings are the truth —
+    reconcile compares them. All writes require an Idempotency-Key: replays return
+    the original response; a reused key with a different body is a conflict.
+paths:
+  /transfers:
+    post:
+      parameters:
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - title: Same-currency
+                  type: object
+                  required: [debit_account_id, credit_account_id, amount_minor, currency]
+                  properties:
+                    debit_account_id:  { type: string, format: uuid }
+                    credit_account_id: { type: string, format: uuid }
+                    amount_minor: { type: integer, minimum: 1 }
+                    currency: { type: string, minLength: 3, maxLength: 3 }
+                    description: { type: string, maxLength: 200 }
+                - title: Cross-currency
+                  required: [debit_account_id, credit_account_id, amount_minor, currency, target_currency, fx_rate]
+                  properties:
+                    target_currency: { type: string, minLength: 3, maxLength: 3 }
+                    fx_rate: { type: string, description: "decimal string, credit = amount × rate" }
+      responses:
+        "201":
+          description: Committed. Entries included.
+        "200":
+          description: Idempotent replay of the original response
+        "422":
+          description: insufficient_funds | currency_mismatch | missing_fx_rate | idempotency_conflict
+  /entries/{entryId}/reversal:
+    post:
+      parameters:
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "201": { description: Mirrored entry; reversal_of set; original untouched }
+        "409": { description: already_reversed }
+  /accounts/{accountId}/statement:
+    get:
+      description: |
+        Keyset pagination over the global postings sequence: cursor = last seq.
+        Order is seq ASC; entries appear exactly once across pages even while
+        transfers commit concurrently (committed rows are never missed because
+        the seq is allocated at insert and the row is visible before the response).
+      parameters:
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: limit,  in: query, schema: { type: integer, default: 100, maximum: 500 } }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, next_cursor]
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/Posting" } }
+                  next_cursor: { type: [string, "null"] }
+  /accounts/{accountId}/reconcile:
+    post:
+      responses:
+        "200":
+          description: |
+            matches=true means the cached balance equals SUM(postings). A mismatch
+            is a bug alarm, not a state to self-heal: the response reports both
+            numbers and the entry where they diverged (first seq after the split).

@@ -1,0 +1,32 @@
+openapi: 3.1.0
+info:
+  title: Ticketing API
+  version: 0.1.0
+paths:
+  /events/{eventId}/availability:
+    get:
+      # TODO: [{tier_id, remaining}] — and a description of how fresh this number is
+      #       (the honest answer depends on your sweep-vs-lazy decision)
+      responses: {}
+  /holds:
+    post:
+      # TODO: {tier_id, quantity} → 201 {hold_id, expires_at}
+      # TODO: 409 insufficient_remaining | 422 event_closed | 422 sales_not_open
+      responses: {}
+  /holds/{holdId}/confirm:
+    post:
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, format: uuid }
+      # TODO: 201 booking | 200 replayed (same key!) | 409 hold_expired
+      #       | 422 idempotency_conflict | 402/422 payment_failed — pick one and define the body
+      responses: {}
+  /bookings/{bookingId}/cancel:
+    post:
+      # TODO: 200 refunded | 422 cancel_window_closed | 409 already_cancelled
+      responses: {}
+components:
+  schemas:
+    Error: {}   # TODO: house envelope; error codes as a documented enum

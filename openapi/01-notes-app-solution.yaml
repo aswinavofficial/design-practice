@@ -1,0 +1,149 @@
+openapi: 3.1.0
+info: { title: Notes API, version: 1.0.0 }
+paths:
+  /notes:
+    get:
+      summary: List notes, newest first
+      parameters:
+        - { name: q,    in: query, schema: { type: string, maxLength: 100 },
+            description: "Case-insensitive substring match on title+body" }
+        - { name: tag,  in: query, schema: { type: string },
+            description: "Tag NAME (normalized) to filter by" }
+        - { name: limit,  in: query, schema: { type: integer, default: 50, maximum: 100 } }
+        - { name: offset, in: query, schema: { type: integer, default: 0, minimum: 0 } }
+      responses:
+        "200":
+          description: A page of notes; empty data list when nothing matches
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/NoteList" }
+    post:
+      summary: Create a note (tags optional, created by name)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NoteInput" }
+      responses:
+        "201":
+          description: Created
+          content: { application/json: { schema: { $ref: "#/components/schemas/Note" } } }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /notes/{noteId}:
+    parameters: [ { $ref: "#/components/parameters/NoteId" } ]
+    get:
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Note" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NotePatch" }
+      responses:
+        "200": { description: Updated, content: { application/json: { schema: { $ref: "#/components/schemas/Note" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    delete:
+      responses:
+        "204": { description: Deleted permanently }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /notes/{noteId}/tags:
+    parameters: [ { $ref: "#/components/parameters/NoteId" } ]
+    put:
+      summary: Replace the note's entire tag set (idempotent)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tags]
+              properties:
+                tags: { type: array, maxItems: 20, items: { type: string } }
+      responses:
+        "200": { description: New tag set, $ref Note }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /tags/{tagId}:
+    patch:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties: { name: { type: string } }
+      responses:
+        "200": { description: Renamed everywhere }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Another tag already has that name
+          content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    delete:
+      responses:
+        "204": { description: Deleted (only when unused) }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: Tag still attached to notes, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+components:
+  parameters:
+    NoteId: { name: noteId, in: path, required: true, schema: { type: string, format: uuid } }
+  responses:
+    NotFound:
+      description: Resource does not exist
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    ValidationError:
+      description: Request body failed validation
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details: { type: object, additionalProperties: true }
+    Note:
+      type: object
+      required: [id, title, body, tags, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        body: { type: string }
+        tags: { type: array, items: { $ref: "#/components/schemas/Tag" } }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    NoteInput:
+      type: object
+      required: [title, body]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200 }
+        body: { type: string, minLength: 1, maxLength: 10000 }
+        tags: { type: array, maxItems: 20, items: { type: string } }
+    NotePatch:
+      description: Absent fields are kept; the request must contain at least one field
+      type: object
+      minProperties: 1
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200 }
+        body: { type: string, minLength: 1, maxLength: 10000 }
+    NoteList:
+      type: object
+      required: [data, total, limit, offset]
+      properties:
+        data: { type: array, items: { $ref: "#/components/schemas/Note" } }
+        total: { type: integer }
+        limit: { type: integer }
+        offset: { type: integer }
+    Tag:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }

@@ -1,0 +1,68 @@
+openapi: 3.1.0
+info:
+  title: Ticketing API
+  version: 1.0.0
+  description: |
+    Idempotency: mutating endpoints require an Idempotency-Key header. Replays return
+    the ORIGINAL response — including a payment failure. Use a fresh key for a
+    deliberate retry. Availability is accurate at read time (live counter arithmetic);
+    expired holds disappear from it the moment they are validated or swept.
+paths:
+  /events/{eventId}/availability:
+    get:
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      required: [tier_id, remaining]
+                      properties:
+                        tier_id: { type: string, format: uuid }
+                        remaining: { type: integer, minimum: 0 }
+  /holds:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tier_id, quantity]
+              properties:
+                tier_id: { type: string, format: uuid }
+                quantity: { type: integer, minimum: 1, maximum: 10 }
+      responses:
+        "201":
+          description: Hold placed; buy before expires_at
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [hold_id, expires_at, unit_price_cents]
+                properties:
+                  hold_id: { type: string, format: uuid }
+                  expires_at: { type: string, format: date-time }
+                  unit_price_cents: { type: integer }
+        "409":
+          description: insufficient_remaining
+          content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+  /holds/{holdId}/confirm:
+    post:
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "201": { description: Booking confirmed with ticket codes }
+        "200": { description: Idempotent replay of the original response }
+        "409":
+          description: hold_expired | hold_already_used
+        "422":
+          description: payment_failed | idempotency_conflict

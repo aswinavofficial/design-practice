@@ -1,0 +1,57 @@
+openapi: 3.1.0
+info:
+  title: Tracker API
+  version: 1.0.0
+  description: |
+    Versioning: breaking changes ship under a new /vN prefix. Breaking = removing
+    or renaming a field, changing a type, adding a required request field, adding
+    an enum value, changing an error code. Non-breaking = adding optional response
+    fields, adding endpoints. Deprecations set Deprecation: true and Sunset: <date>
+    and remain functional for at least 6 months.
+paths:
+  /v1/orgs/{orgId}/issues:
+    get:
+      description: |
+        Cross-workspace issue list. Cursor pagination is uniform across all list
+        endpoints: pass next_cursor back as cursor; opaque, versioned ("v1:").
+        A garbage or stale cursor is 400 invalid_cursor — never a silent restart.
+      parameters:
+        - { name: status,    in: query, schema: { $ref: "#/components/schemas/IssueStatus" } }
+        - { name: assignee,  in: query, schema: { type: string, format: uuid } }
+        - { name: sprint,    in: query, schema: { type: string, format: uuid } }
+        - { name: limit,     in: query, schema: { type: integer, default: 50, maximum: 100 } }
+        - { name: cursor,    in: query, schema: { type: string } }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, next_cursor]
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/Issue" } }
+                  next_cursor: { type: [string, "null"] }
+        "400": { description: invalid_cursor }
+        "404": { description: Unknown org OR caller not a member — identical body }
+  /v1/orgs/{orgId}/webhooks:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url, events]
+              properties:
+                url: { type: string, format: uri, pattern: "^https://" }
+                events: { type: array, items: { type: string, enum: [issue.created, issue.updated, comment.created] } }
+      responses:
+        "201":
+          description: Registered. secret is shown ONCE — store it now.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  secret: { type: string }
+        "403": { description: insufficient_role }

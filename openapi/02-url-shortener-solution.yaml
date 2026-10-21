@@ -1,0 +1,28 @@
+openapi: 3.1.0
+info: { title: Shortener API, version: 1.0.0 }
+paths:
+  /r/{code}:
+    get:
+      summary: Redirect to the target URL
+      description: |
+        Returns 302 (not 301) deliberately: 301 is cacheable, and a cached redirect
+        never reaches this server again — every one of those visits is missing from
+        the stats. The extra round trip is the price of truthful analytics.
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string, maxLength: 64 } }
+      responses:
+        "302":
+          description: Temporary redirect to the target
+          headers:
+            Location:
+              description: The original target URL, byte-exact
+              schema: { type: string, format: uri }
+            Cache-Control:
+              description: "no-store: proxies must not cache the redirect either"
+              schema: { type: string }
+        "404":
+          description: Unknown code, or code deactivated (deliberately indistinguishable)
+          content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+        "410":
+          description: Link expired per expires_on
+          content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }

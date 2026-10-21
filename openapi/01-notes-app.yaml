@@ -1,0 +1,41 @@
+openapi: 3.1.0
+info:
+  title: Notes API
+  version: 0.1.0
+paths:
+  /notes:
+    get:
+      summary: List notes (newest first)
+      parameters:
+        - name: q          # TODO: requirement 6 — search
+          in: query
+          schema: { type: string }
+        - name: tag        # TODO: requirement 5 — by id or by name?
+          in: query
+          schema: { type: string }
+        # TODO: pagination params — decide the style now, reuse it in all 9 later projects
+      responses:
+        "200":
+          description: A page of notes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NoteList"
+    post:
+      summary: Create a note
+      # TODO: request body schema; does it accept tags inline?
+      # TODO: 201 with the new note? Location header? What are the 4xx cases (422?)
+      responses: {}
+  # TODO: /notes/{noteId} — get, patch/put, delete (define every response)
+  # TODO: /notes/{noteId}/tags
+  # TODO: /tags — list, rename, delete
+components:
+  schemas:
+    Error:
+      # TODO: your error envelope, defined ONCE here, $ref'd everywhere
+      type: object
+    Note:
+      type: object
+      # TODO: required fields, nullable fields, formats
+      properties:
+        id: { type: string }

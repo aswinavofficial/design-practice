@@ -1,0 +1,78 @@
+openapi: 3.1.0
+info:
+  title: Job Board API
+  version: 1.0.0
+  description: |
+    Isolation policy: any resource outside the caller's scope returns 404,
+    byte-identical to a nonexistent resource. 403 is reserved for in-scope,
+    insufficient-role cases. The candidate timeline and the recruiter audit
+    log read the same event rows; note text is recruiter-only.
+paths:
+  /jobs/{jobId}/applications:
+    post:
+      description: |
+        Draft or closed job → 404 (indistinguishable from unknown — drafts do
+        not exist for candidates). Published & closed status → 422 job_closed.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cover_note, resume_ref]
+              properties:
+                cover_note: { type: string, minLength: 1, maxLength: 4000 }
+                resume_ref: { type: string, pattern: "^resume:[A-Za-z0-9]{22}$" }
+      responses:
+        "201": { description: Application created; creation event logged }
+        "409": { description: already_applied }
+        "422": { description: job_closed | validation_failed }
+  /applications/{applicationId}/advance:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [to_stage]
+              properties:
+                to_stage: { type: string, enum: [screening, interview, offer, hired] }
+      responses:
+        "200": { description: Moved; event appended }
+        "404": { description: Unknown OR foreign company's application (identical body) }
+        "403": { description: insufficient_role }
+        "422": { description: invalid_transition (e.g. applied→offer; stage skips) }
+  /applications/{applicationId}/reject:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [note]
+              properties: { note: { type: string, minLength: 1, maxLength: 2000 } }
+      responses:
+        "200": { description: Rejected; note stored on the event }
+        "422": { description: rejection_note_required | invalid_transition }
+  /my/applications/{applicationId}:
+    get:
+      responses:
+        "200":
+          description: Application + timeline; note fields are stripped, never false-filled
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Application"
+                  - type: object
+                    properties:
+                      timeline:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            from_stage: { type: [string, "null"] }
+                            to_stage: { type: string }
+                            occurred_at: { type: string, format: date-time }

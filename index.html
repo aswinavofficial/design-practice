@@ -6,6 +6,9 @@
 <title>API Design Practice — from requirements to schema & contract</title>
 <meta name="description" content="10 graded practice projects for turning software requirements into database schemas and API contracts.">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.17.14/swagger-ui.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/material-darker.min.css">
 <style>
   :root {
     --bg: #f6f7f9; --panel: #ffffff; --text: #1c2130; --muted: #5b6472;
@@ -103,6 +106,31 @@
     background: var(--accent); color: #fff; font-size: 11px; font-weight: 800;
     letter-spacing: .08em; padding: 3px 9px; border-radius: 999px; text-transform: uppercase;
   }
+  .doc-nav-right { display: flex; align-items: center; gap: 12px; }
+  .studio-btn {
+    background: var(--accent-soft); color: var(--accent); border: 1px solid var(--border);
+    border-radius: 8px; padding: 5px 12px; font-size: 13px; font-weight: 600;
+    cursor: pointer; text-decoration: none; font-family: inherit;
+  }
+  .studio-btn:hover { border-color: var(--accent); }
+  #studio-overlay { position: fixed; inset: 0; z-index: 50; background: var(--bg); display: flex; flex-direction: column; }
+  #studio-header {
+    display: flex; align-items: center; gap: 10px; padding: 10px 14px; flex-wrap: wrap;
+    background: var(--panel); border-bottom: 1px solid var(--border);
+  }
+  #studio-header .sh-title { font-weight: 700; }
+  #studio-status { font-size: 13px; color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  #studio-status.ok { color: #16a34a; }
+  #studio-status.err { color: #dc2626; }
+  #studio-split { flex: 1; display: flex; min-height: 0; }
+  #studio-editor-pane { width: 44%; min-width: 300px; border-right: 1px solid var(--border); display: flex; }
+  #studio-editor-pane .CodeMirror { height: 100%; font-size: 13px; line-height: 1.5; }
+  #studio-render-pane { flex: 1; overflow-y: auto; background: #fff; min-width: 0; }
+  #studio-render-pane .swagger-ui { padding: 12px 20px 40px; }
+  @media (max-width: 860px) {
+    #studio-split { flex-direction: column; }
+    #studio-editor-pane { width: 100%; min-width: 0; height: 45%; border-right: none; border-bottom: 1px solid var(--border); }
+  }
   footer { border-top: 1px solid var(--border); color: var(--muted); font-size: 13px; padding: 18px 20px 44px; text-align: center; }
   footer a { color: var(--muted); }
 </style>
@@ -129,6 +157,10 @@
       <span class="st">Start here → workflow &amp; conventions</span><br>
       <span class="sd">How each project works, the rules of the game, and the house conventions (IDs, money, errors, pagination) reused across all ten.</span>
     </a>
+    <a class="start-card" href="#" id="open-studio">
+      <span class="st">API Studio → edit &amp; render OpenAPI contracts</span><br>
+      <span class="sd">A built-in YAML editor with live Swagger UI rendering. Opens pre-filled from any project page via its “API Studio” button, or start from a blank template here.</span>
+    </a>
     <h2 class="section">The ladder — easiest first</h2>
     <div class="cards" id="cards"></div>
   </section>
@@ -136,7 +168,10 @@
   <section id="view-doc" hidden>
     <nav class="doc-nav">
       <a href="#home">← Overview</a>
-      <a id="src-link" href="#" target="_blank" rel="noopener">View source on GitHub ↗</a>
+      <span class="doc-nav-right">
+        <button id="studio-btn" class="studio-btn" type="button" hidden>API Studio</button>
+        <a id="src-link" href="#" target="_blank" rel="noopener">View source on GitHub ↗</a>
+      </span>
     </nav>
     <article id="doc-body" class="markdown-body"></article>
     <nav class="pager">
@@ -148,6 +183,20 @@
   </section>
 </main>
 
+<div id="studio-overlay" hidden>
+  <header id="studio-header">
+    <span class="sh-title">API Studio</span>
+    <span id="studio-status"></span>
+    <button class="studio-btn" id="studio-copy" type="button">Copy YAML</button>
+    <a class="studio-btn" id="studio-external" href="#" target="_blank" rel="noopener" hidden>editor-next ↗</a>
+    <button class="studio-btn" id="studio-close" type="button">✕ Close</button>
+  </header>
+  <div id="studio-split">
+    <div id="studio-editor-pane"><textarea id="studio-editor"></textarea></div>
+    <div id="studio-render-pane"><div id="swagger-ui"></div></div>
+  </div>
+</div>
+
 <footer>
   Rendered in your browser with marked, highlight.js and mermaid ·
   <a href="https://github.com/aswinavofficial/design-practice" target="_blank" rel="noopener">site source</a>
@@ -156,6 +205,10 @@
 <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11.2.0/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/yaml/yaml.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.17.14/swagger-ui-bundle.js"></script>
 <script>
   const REPO = "https://github.com/aswinavofficial/design-practice";
   const PROJECTS = [
@@ -249,6 +302,15 @@
     }
     window.scrollTo({ top: 0 });
 
+    const specYaml = findSpecYaml(body);
+    const studioBtn = $("#studio-btn");
+    if (specYaml) {
+      studioBtn.hidden = false;
+      studioBtn.onclick = () => openStudio(specYaml, proj ? proj.id : null);
+    } else {
+      studioBtn.hidden = true;
+    }
+
     if (proj && mySeq === fetchSeq) {
       const sec = document.createElement("section");
       sec.id = "solution-section";
@@ -318,6 +380,12 @@
       if (mySeq !== undefined && mySeq !== fetchSeq) return;
       bodyEl.innerHTML = marked.parse(md);
       await enhanceMarkdown(bodyEl);
+      const solSpec = findSpecYaml(bodyEl);
+      if (solSpec) {
+        const studioBtn = $("#studio-btn");
+        studioBtn.hidden = false;
+        studioBtn.onclick = () => openStudio(solSpec, proj.id + "-solution");
+      }
       document.title = "Solution · " + proj.title + " — API Design Practice";
       sec.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (err) {
@@ -352,6 +420,133 @@
       showDoc(id);
     }
   }
+
+  // ---------- API Studio: built-in OpenAPI editor + live Swagger UI ----------
+
+  const STARTER_SPEC = `openapi: 3.1.0
+info:
+  title: My API
+  version: 0.1.0
+paths:
+  /ping:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pong:
+                    type: boolean
+`;
+
+  const studio = { cm: null, ui: null, ready: false, suppress: false, timer: null };
+
+  function findSpecYaml(root) {
+    const el = [...root.querySelectorAll("pre code.language-yaml")]
+      .find((el) => el.textContent.includes("openapi:"));
+    return el ? el.textContent : null;
+  }
+
+  function studioStatus(msg, cls) {
+    const el = $("#studio-status");
+    el.textContent = msg;
+    el.className = cls || "";
+  }
+
+  function ensureStudio() {
+    if (studio.ready) return;
+    studio.ready = true;
+    const darkMode = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    studio.cm = CodeMirror.fromTextArea(document.getElementById("studio-editor"), {
+      mode: "yaml",
+      lineNumbers: true,
+      lineWrapping: true,
+      theme: darkMode ? "material-darker" : "default",
+    });
+    studio.cm.on("change", () => {
+      if (!studio.suppress) scheduleStudioRender();
+    });
+    $("#studio-copy").addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(studio.cm.getValue());
+        const b = $("#studio-copy");
+        b.textContent = "Copied!";
+        setTimeout(() => (b.textContent = "Copy YAML"), 1200);
+      } catch { studioStatus("Clipboard blocked — select the text manually", "err"); }
+    });
+    $("#studio-close").addEventListener("click", closeStudio);
+  }
+
+  function scheduleStudioRender() {
+    clearTimeout(studio.timer);
+    studio.timer = setTimeout(renderStudioSpec, 500);
+  }
+
+  function mountSwagger(obj) {
+    // Fresh mount per render: updateJsonSpec races Swagger UI's async init,
+    // but a spec passed at construction always renders.
+    const holder = document.getElementById("swagger-ui");
+    holder.innerHTML = "";
+    SwaggerUIBundle({
+      dom_id: "#swagger-ui",
+      spec: obj,
+      presets: [SwaggerUIBundle.presets.apis],
+      docExpansion: "list",
+      defaultModelsExpandDepth: 1,
+    });
+  }
+
+  function renderStudioSpec() {
+    const text = studio.cm.getValue();
+    try {
+      const obj = jsyaml.load(text);
+      if (typeof obj !== "object" || obj === null) throw new Error("document is empty");
+      const paths = obj.paths ? Object.keys(obj.paths).length : 0;
+      mountSwagger(obj);
+      const version = obj.openapi ? "OpenAPI " + obj.openapi : obj.swagger ? "Swagger " + obj.swagger : "spec";
+      studioStatus(`✓ ${version} · ${paths} path${paths === 1 ? "" : "s"}`, "ok");
+    } catch (e) {
+      const at = e.mark ? `line ${e.mark.line + 1}: ` : "";
+      studioStatus(`✗ YAML error — ${at}${e.message}`, "err");
+    }
+  }
+
+  function openStudio(yamlText, sourceName) {
+    ensureStudio();
+    $("#studio-overlay").hidden = false;
+    document.body.style.overflow = "hidden";
+    studio.suppress = true;
+    studio.cm.setValue(yamlText);
+    studio.suppress = false;
+    renderStudioSpec();
+    const ext = $("#studio-external");
+    if (sourceName) {
+      // import into the hosted Swagger Editor from the deployed extracted YAML
+      const base = location.pathname.replace(/\/[^/]*$/, "/");
+      ext.href = "https://editor-next.swagger.io/?url=" +
+        encodeURIComponent(location.origin + base + "openapi/" + sourceName + ".yaml");
+      ext.hidden = false;
+    } else {
+      ext.hidden = true;
+    }
+  }
+
+  function closeStudio() {
+    $("#studio-overlay").hidden = true;
+    document.body.style.overflow = "";
+  }
+
+  $("#open-studio").addEventListener("click", (e) => {
+    e.preventDefault();
+    openStudio(STARTER_SPEC, null);
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("#studio-overlay").hidden) closeStudio();
+  });
 
   buildCards();
   window.addEventListener("hashchange", route);

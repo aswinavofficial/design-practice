@@ -1,0 +1,42 @@
+openapi: 3.1.0
+info:
+  title: Todos API
+  version: 0.1.0
+components:
+  securitySchemes:
+    bearerAuth:            # TODO: describe where the token comes from
+      type: http
+      scheme: bearer
+  schemas:
+    Error: {}              # TODO: house envelope
+    TaskStatus:
+      type: string
+      enum: [todo, doing, done]   # TODO: does the API ever accept other casing?
+paths:
+  /auth/login:
+    post:
+      # TODO: request, 200 with token, 401 bad credentials
+      #       (401 or 404 for unknown email — which, and why?)
+      security: []
+      responses: {}
+  /projects/{projectId}/tasks:
+    get:
+      security: [{ bearerAuth: [] }]
+      # TODO: filters (status), sort, pagination
+      # TODO: 404 (project unknown OR not yours — same response, deliberately)
+      responses: {}
+    post:
+      security: [{ bearerAuth: [] }]
+      # TODO: 201 | 422 validation (what exactly is invalid?)
+      responses: {}
+  /tasks/{taskId}:
+    patch:
+      security: [{ bearerAuth: [] }]
+      # TODO: partial update semantics written in the description
+      # TODO: can status change here? or only via /complete? decide, then spec it
+      responses: {}
+  /tasks/{taskId}/complete:
+    post:
+      security: [{ bearerAuth: [] }]
+      # TODO: 200 with the task | 422 invalid_transition (already done?)
+      responses: {}

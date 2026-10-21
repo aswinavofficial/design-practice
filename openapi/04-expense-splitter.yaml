@@ -1,0 +1,28 @@
+openapi: 3.1.0
+info:
+  title: Expense Splitter API
+  version: 0.1.0
+paths:
+  /groups/{groupId}/expenses:
+    post:
+      # TODO: body — payer, amount_cents, description, spent_on,
+      #       split: {mode: equal, member_ids: [...]} | {mode: exact, shares: [{user_id, amount_cents}]}
+      # TODO: 201 | 422 shares_do_not_sum | 422 unknown_member | 403 not_a_member
+      responses: {}
+  /groups/{groupId}/balances:
+    get:
+      # TODO: computed resource — response {balances: [{user_id, balance_cents}]}
+      #       positive = owed, negative = owes — write that convention into the description
+      responses: {}
+  /groups/{groupId}/suggested-settlements:
+    get:
+      # TODO: [{from_user_id, to_user_id, amount_cents}]
+      #       document: greedy approximation, ordering unspecified?
+      responses: {}
+  /groups/{groupId}/settlements:
+    post:
+      # TODO: 201 | 422 amount_exceeds_debt? (decide whether that's even an error)
+      responses: {}
+components:
+  schemas:
+    Error: {}   # TODO: house envelope; add codes: shares_do_not_sum, member_has_balance, ...

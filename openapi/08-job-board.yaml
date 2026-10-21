@@ -1,0 +1,33 @@
+openapi: 3.1.0
+info:
+  title: Job Board API
+  version: 0.1.0
+paths:
+  /jobs/{jobId}/applications:
+    get:
+      # recruiter, same company only
+      # TODO: ?stage=&limit=&cursor= — 404 if job is another company's (byte-identical
+      #       to unknown job) — write that requirement into the description
+      responses: {}
+  /jobs/{jobId}/applications:   # POST on the same path — candidate applies
+    post:
+      # TODO: 201 | 409 already_applied | 422 job_not_published | 422 job_closed
+      #       — note: draft job for an outsider is 404, NOT 422. why? (document it)
+      responses: {}
+  /applications/{applicationId}/advance:
+    post:
+      # TODO: body {to_stage, note?} — 200 with application+event
+      #       | 422 invalid_transition | 403 cross_company (member of another company)
+      #       — and 404 if not a member of this company at all — why the difference?
+      responses: {}
+  /applications/{applicationId}/reject:
+    post:
+      # TODO: note REQUIRED here — 422 rejection_note_required
+      responses: {}
+  /my/applications/{applicationId}:
+    get:
+      # TODO: application + timeline; note visibility rules in the description
+      responses: {}
+components:
+  schemas:
+    Error: {}   # TODO: house envelope; define invalid_transition's details payload

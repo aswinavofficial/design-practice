@@ -82,6 +82,9 @@ Reserved aliases (`api`, `health`, `admin`, `stats`, `r`, `links`, `static`, `as
 ### The redirect endpoint, modeled properly
 
 ```yaml
+openapi: 3.1.0
+info: { title: Shortener API, version: 1.0.0 }
+paths:
   /r/{code}:
     get:
       summary: Redirect to the target URL

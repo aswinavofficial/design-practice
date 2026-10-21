@@ -1,0 +1,88 @@
+openapi: 3.1.0
+info:
+  title: Expense Splitter API
+  version: 1.0.0
+paths:
+  /groups/{groupId}/expenses:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - title: Equal split
+                  type: object
+                  required: [payer_id, amount_cents, description, spent_on, split]
+                  properties:
+                    payer_id: { type: string, format: uuid }
+                    amount_cents: { type: integer, minimum: 1 }
+                    description: { type: string, maxLength: 200 }
+                    spent_on: { type: string, format: date }
+                    split:
+                      type: object
+                      required: [mode, member_ids]
+                      properties:
+                        mode: { type: string, enum: [equal] }
+                        member_ids: { type: array, minItems: 1, items: { type: string, format: uuid } }
+                - title: Exact amounts
+                  properties:
+                    split:
+                      type: object
+                      required: [mode, shares]
+                      properties:
+                        mode: { type: string, enum: [exact] }
+                        shares:
+                          type: array
+                          minItems: 1
+                          items:
+                            type: object
+                            required: [user_id, amount_cents]
+                            properties:
+                              user_id: { type: string, format: uuid }
+                              amount_cents: { type: integer, minimum: 0 }
+      responses:
+        "201": { description: Expense with resolved shares }
+        "422":
+          description: shares_do_not_sum | unknown_member | payer_not_member | not_a_member
+          content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+  /groups/{groupId}/balances:
+    get:
+      description: |
+        Positive balance = the group owes this member. Computed live from
+        expenses + settlements; ordering is by balance descending, user_id ascending.
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      required: [user_id, balance_cents]
+                      properties:
+                        user_id: { type: string, format: uuid }
+                        balance_cents: { type: integer }
+  /groups/{groupId}/suggested-settlements:
+    get:
+      description: |
+        Greedy pairwise netting (max debtor ↔ max creditor). Near-minimal transfer
+        count, NOT provably minimal. Deterministic: ties broken by user_id.
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        from_user_id: { type: string, format: uuid }
+                        to_user_id: { type: string, format: uuid }
+                        amount_cents: { type: integer, minimum: 1 }

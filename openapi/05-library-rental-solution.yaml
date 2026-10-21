@@ -1,0 +1,40 @@
+openapi: 3.1.0
+info:
+  title: Library API
+  version: 1.0.0
+paths:
+  /loans:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [copy_id, member_id]
+              properties:
+                copy_id: { type: string, format: uuid }
+                member_id: { type: string, format: uuid }
+      responses:
+        "201": { description: Loan created; due_on = checkout + 14 }
+        "409":
+          description: copy_not_available | copy_reserved_for_pickup
+          content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+        "422":
+          description: loan_limit_reached | member_overdue | member_suspended
+          content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+  /books/{bookId}/availability:
+    get:
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [copies_total, copies_available, active_loans, queue_length]
+                properties:
+                  copies_total: { type: integer }
+                  copies_available: { type: integer }
+                  active_loans: { type: integer }
+                  queue_length: { type: integer }
+                  next_ready_at: { type: [string, "null"], format: date-time }

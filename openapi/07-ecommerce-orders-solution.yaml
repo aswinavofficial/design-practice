@@ -1,0 +1,57 @@
+openapi: 3.1.0
+info:
+  title: Shop API
+  version: 1.0.0
+paths:
+  /products:
+    get:
+      description: |
+        Filters AND together. Unknown filter names are 400 unknown_filter.
+        price_min/price_max are integer cents, inclusive. in_stock=true means
+        every listed variant has on_hand > 0. sort: newest (default) | price.
+      parameters:
+        - { name: category,  in: query, schema: { type: string } }
+        - { name: price_min, in: query, schema: { type: integer, minimum: 0 } }
+        - { name: price_max, in: query, schema: { type: integer, minimum: 0 } }
+        - { name: in_stock,  in: query, schema: { type: boolean } }
+        - { name: q,         in: query, schema: { type: string, maxLength: 100 } }
+        - { name: sort,      in: query, schema: { type: string, enum: [newest, price] } }
+      responses:
+        "200": { description: Page of active products with variant summaries }
+        "400": { description: unknown_filter | invalid_cursor }
+  /carts/{cartId}/checkout:
+    post:
+      parameters:
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
+        - { name: X-Cart-Token, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [shipping_address]
+              properties:
+                shipping_address: { type: object }
+      responses:
+        "201": { description: Order placed; totals frozen; stock deducted }
+        "200": { description: Idempotent replay }
+        "409": { description: out_of_stock (details.skus) | cart_empty }
+  /admin/orders/{orderNumber}/transitions:
+    post:
+      description: |
+        One endpoint, one place for transition rules. Actions: mark_paid, cancel,
+        ship (requires tracking_number), deliver, refund. Anything else per the
+        state machine is 422 invalid_transition.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action: { type: string, enum: [mark_paid, cancel, ship, deliver, refund] }
+                tracking_number: { type: string }
+      responses:
+        "200": { description: Updated order }
+        "422": { description: invalid_transition | missing_field }

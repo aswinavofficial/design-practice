@@ -1,0 +1,82 @@
+openapi: 3.1.0
+info:
+  title: Todos API
+  version: 1.0.0
+  description: |
+    Ownership is invisible: any foreign or unknown resource returns the same 404.
+    PATCH semantics: absent fields are kept, explicit null clears nullable fields.
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, description: "Session token from /auth/login" }
+  schemas:
+    TaskStatus:  { type: string, enum: [todo, doing, done] }
+    TaskPriority: { type: string, enum: [low, medium, high] }
+    Task:
+      type: object
+      required: [id, project_id, title, status, priority, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        project_id: { type: string, format: uuid }
+        title: { type: string }
+        notes: { type: [string, "null"] }
+        status: { $ref: "#/components/schemas/TaskStatus" }
+        priority: { $ref: "#/components/schemas/TaskPriority" }
+        due_date: { type: [string, "null"], format: date }
+        completed_at: { type: [string, "null"], format: date-time }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    TaskPatch:
+      type: object
+      minProperties: 1
+      description: "Absent = keep. null clears notes/due_date."
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200 }
+        notes: { type: [string, "null"] }
+        status: { $ref: "#/components/schemas/TaskStatus" }
+        priority: { $ref: "#/components/schemas/TaskPriority" }
+        due_date: { type: [string, "null"], format: date }
+paths:
+  /auth/login:
+    post:
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties: { email: { type: string }, password: { type: string } }
+      responses:
+        "200":
+          description: Session token
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [token, expires_at]
+                properties: { token: { type: string }, expires_at: { type: string, format: date-time } }
+        "401":
+          description: Bad credentials — identical for unknown email and wrong password
+          content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+  /tasks/{taskId}/complete:
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Mark done; sets completed_at. Idempotent when already done.
+      responses:
+        "200": { description: The task, status=done }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /tasks/{taskId}:
+    patch:
+      security: [{ bearerAuth: [] }]
+      description: |
+        Status transitions allowed here: todo->doing, doing->todo, doing->done,
+        done->todo (reopen, clears completed_at). done->doing is rejected.
+        todo->done must use POST /tasks/{id}/complete.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/TaskPatch" } } } }
+      responses:
+        "200": { description: Updated task }
+        "422":
+          description: invalid_transition | validation_failed
+          content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }

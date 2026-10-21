@@ -1,0 +1,30 @@
+openapi: 3.1.0
+info:
+  title: Library API
+  version: 0.1.0
+paths:
+  /loans:
+    post:
+      # TODO: body {copy_id, member_id} (staff checkout)
+      # TODO: 201 | 409 copy_not_available | 422 loan_limit_reached
+      #       | 422 member_overdue | 422 member_suspended
+      #       — each 422 uses the house Error envelope with its code
+      responses: {}
+  /loans/{loanId}/return:
+    post:
+      # TODO: 200 with loan + resulting reservation state change?
+      #       What does the response look like when a reservation just became ready?
+      responses: {}
+  /books/{bookId}/reservations:
+    post:
+      # TODO: 201 | 409 already_reserved_by_you | 422 copies_available_no_reservation
+      #       | 422 title_on_loan_to_you
+      responses: {}
+  /books/{bookId}/availability:
+    get:
+      # TODO: {copies_available, active_loans, queue_length, next_ready_at?}
+      #       — is this derived or read from stored status? your earlier decision shows here
+      responses: {}
+components:
+  schemas:
+    Error: {}   # TODO: house envelope + this project's error codes as an enum? or free string?

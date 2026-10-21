@@ -1,0 +1,26 @@
+openapi: 3.1.0
+info:
+  title: Tracker API
+  version: 1.0.0
+  description: |
+    Versioning policy: breaking changes ship under a new /vN prefix.
+    Deprecations are signaled with Deprecation and Sunset headers.
+    Webhooks are at-least-once; receivers MUST dedupe by event id.
+    # TODO: finish this paragraph — it IS the contract
+paths:
+  /v1/orgs/{orgId}/issues:
+    get:
+      # TODO: cross-workspace issue list with filters (status, assignee, sprint)
+      #       cursor pagination params + response shape {data, next_cursor}
+      #       400 invalid_cursor — or document your alternative choice
+      responses: {}
+  /v1/orgs/{orgId}/webhooks:
+    post:
+      # TODO: {url, events: [...]} → 201 with secret (shown ONCE — say so)
+      # TODO: 422 unreachable_url? (do you probe? decide) | 403 not_admin
+      responses: {}
+components:
+  schemas:
+    WebhookEvent:
+      # TODO: {id, type, created_at, data} — document at-least-once + no ordering
+    Error: {}   # TODO: house envelope + rate_limited (429) shape

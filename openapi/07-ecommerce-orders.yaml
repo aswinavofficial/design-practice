@@ -1,0 +1,28 @@
+openapi: 3.1.0
+info:
+  title: Shop API
+  version: 0.1.0
+paths:
+  /products:
+    get:
+      # TODO: parameters — category, price_min, price_max, in_stock, q, sort, limit/cursor
+      #       description documents: AND semantics, unknown filter = 400, empty q = ignored
+      responses: {}
+  /carts/{cartId}/checkout:
+    post:
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, format: uuid }
+      # TODO: 201 order | 409 out_of_stock {details: {skus: [...]}} | 422 empty_cart
+      #       | 200 replayed
+      responses: {}
+  /orders/{orderId}:
+    get:
+      # TODO: order + items with snapshot fields; 404 (or is-order-yours? you have no auth
+      #       unless you carried it over from 03 — decide: guest orders vs user orders)
+      responses: {}
+components:
+  schemas:
+    Error: {}   # TODO: house envelope; out_of_stock carries a details payload — model it
