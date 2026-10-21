@@ -5,6 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>API Design Practice — from requirements to schema & contract</title>
 <meta name="description" content="10 graded practice projects for turning software requirements into database schemas and API contracts.">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e1014" media="(prefers-color-scheme: dark)">
+<link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="API Practice">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.17.14/swagger-ui.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
@@ -152,6 +161,20 @@
   @media (max-width: 860px) {
     #studio-split { flex-direction: column; }
     #studio-editor-pane { width: 100%; min-width: 0; height: 45%; border-right: none; border-bottom: 1px solid var(--border); }
+  }
+  @media (max-width: 640px) {
+    .wrap { padding: 0 14px; }
+    .header-inner { padding: 12px 14px; gap: 10px; }
+    .tagline { display: none; }
+    main { padding: 18px 0 40px; }
+    .intro { font-size: 15px; }
+    .markdown-body { padding: 20px 16px; }
+    .markdown-body h1 { font-size: 22px; }
+    .markdown-body h2 { font-size: 17.5px; }
+    .doc-nav { flex-wrap: wrap; gap: 8px; }
+    .pager { flex-wrap: wrap; row-gap: 6px; }
+    .start-card { padding: 14px 16px; }
+    .card { padding: 14px; }
   }
   footer { border-top: 1px solid var(--border); color: var(--muted); font-size: 13px; padding: 18px 20px 44px; text-align: center; }
   footer a { color: var(--muted); }
@@ -621,6 +644,13 @@ paths:
   buildCards();
   window.addEventListener("hashchange", route);
   route();
+
+  // PWA: offline-first via service worker (secure contexts only)
+  if ("serviceWorker" in navigator &&
+      (location.protocol === "https:" || ["localhost", "127.0.0.1"].includes(location.hostname))) {
+    navigator.serviceWorker.register("sw.js")
+      .catch((err) => console.warn("Service worker registration failed:", err));
+  }
 </script>
 </body>
 </html>

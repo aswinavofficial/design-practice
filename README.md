@@ -103,6 +103,14 @@ blocks are extracted to `openapi/<slug>.yaml` at deploy time
 (`scripts/extract_openapi.py`), which is what the import link opens in the hosted
 Swagger Editor. The home page also offers a blank-template studio.
 
+## PWA
+
+The site is installable and works offline: a service worker (`sw.js`) precaches
+every brief, solution, contract, and icon on first visit; CDN assets are cached
+on use. Updates deploy with a fresh cache version (stamped with the git SHA by
+the workflow) and apply on your next visit. Layout is responsive down to phone
+sizes.
+
 ## Pacing
 
 Do **01–03 fully** — they build the reflexes. Skim 04–05 (ERD + decisions only) if time is short. Then pick **two** of 06–10 and go deep. Every project assumes the conventions of the ones before it.

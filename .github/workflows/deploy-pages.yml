@@ -24,6 +24,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Stamp service worker cache version
+        run: |
+          sed -i.bak "s/__CACHE_VERSION__/$(git rev-parse --short HEAD)/" sw.js
+          rm sw.js.bak
+
       - name: Extract OpenAPI specs (for Swagger Editor import)
         run: python3 scripts/extract_openapi.py
 
